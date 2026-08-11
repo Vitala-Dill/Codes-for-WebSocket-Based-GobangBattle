@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.gobang_battle.mapper.UserMapper">
+    <insert id="insertUser">
+        insert into `user` (`username`, `password`, `score`, `total_count`, `win_count`, `create_time`, `update_time`
+        ) values (#{username}, #{password}, #{score}, #{totalCount}, #{winCount}, now(), now())
+    </insert>
+
+    <update id="userWin">
+        update user set total_count = total_count + 1, win_count = win_count + 1, score = score + 100
+        where user_id = #{userId}
+    </update>
+
+    <update id="userLose">
+        update user set total_count = total_count + 1, score = score - 100
+        where user_id = #{userId}
+    </update>
+</mapper>

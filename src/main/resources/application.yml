@@ -1,0 +1,14 @@
+spring:
+  application:
+   name=gobang_battle
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/java_gobang?characterEncoding=utf8&useSSL=false
+    username: root
+    password: Qwer1234!
+    driver-class-name: com.mysql.cj.jdbc.Driver
+# ?? Mybatis ? xml ????
+mybatis:
+  mapper-locations: classpath:mapper/**Mapper.xml
+  configuration: # ???? MyBatis ??? SQL
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true  #??????

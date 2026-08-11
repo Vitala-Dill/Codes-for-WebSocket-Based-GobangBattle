@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>对战中 · 五子棋对战</title>
+    <link rel="icon" href="battle.png" type="image/png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(145deg, #f7f3e9 0%, #e8e0d5 100%);
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 14px 40px;
+            background: rgba(30, 30, 35, 0.85);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            color: #f5efe8;
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #b8a58b;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-left .brand {
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: #f5efe8;
+        }
+
+        .battle-container {
+            width: 100%;
+            max-width: 560px;
+            margin: 100px auto 40px;
+            padding: 0 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 70vh;
+        }
+
+        .battle-dialog {
+            background: rgba(30, 30, 35, 0.85);
+            backdrop-filter: blur(4px);
+            border-radius: 48px;
+            padding: 2.8rem 2.5rem 3rem;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 235, 210, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas#chess {
+            display: block;
+            width: 450px;
+            height: 450px;
+            border-radius: 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            background: #ffffff;
+            cursor: pointer;
+        }
+
+        #screen {
+            margin-top: 20px;
+            width: 100%;
+            background: rgba(255, 235, 210, 0.7);
+            padding: 14px 10px;
+            border-radius: 40px;
+            text-align: center;
+            border: 1px solid rgba(200, 180, 160, 0.25);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #3d2c1e;
+            min-height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 520px) {
+            .battle-dialog {
+                padding: 2rem 1.5rem 2.2rem;
+                border-radius: 36px;
+            }
+
+            .nav {
+                padding: 12px 20px;
+                font-size: 1.4rem;
+            }
+
+            .nav-left .brand {
+                font-size: 1.4rem;
+            }
+
+            canvas#chess {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 1/1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="nav">
+        <div class="nav-left">
+            <span class="brand">网页五子棋对战</span>
+        </div>
+    </div>
+
+    <div class="battle-container">
+        <div class="battle-dialog">
+            <canvas id="chess" height="450" width="450"></canvas>
+            <div id="screen">等待游戏开始...</div>
+        </div>
+    </div>
+    <script>
+        let gameInfo = {
+            roomId: null,
+            thisUserId: null,
+            thatUserId: null,
+            isWhite: true,
+        };
+        //存储所有已经下了的棋子
+        let allSteps = [];
+        let chessBoard = [];
+        let me = true;
+        let over = false;
+
+        function setScreenText(me) {
+            let screen = document.querySelector('#screen');
+            if (me) {
+                screen.innerHTML = "轮到你落子了!";
+            } else {
+                screen.innerHTML = "轮到对方落子了!";
+            }
+        }
+
+        //初始化websocket，检查当前的websocket是否可用
+        let websocketUrl = "ws://"+ location. host +"/battle";
+        try {
+            websocket = new WebSocket(websocketUrl);
+        } catch (e) {
+            console.error("WebSocket 连接失败，请确保后端服务已启动:", e);
+            document.querySelector('#screen').innerHTML = "连接服务器失败，请检查后端是否运行";
+        }
+
+        if (websocket) {
+            websocket.onopen = function () {
+                console.log("连接游戏房间成功!");
+            }
+
+            websocket.onclose = function () {
+                console.log("和服务器连接断开!");
+            }
+
+            websocket.onerror = function () {
+                console.log("和服务器连接出现错误!");
+            }
+            //监听页面关闭，关闭就断开连接
+            window.onbeforeunload = function () {
+                websocket.close();
+            }
+            //处理服务器返回的响应数据
+            websocket.onmessage = function (event) {
+                console.log("[handlerGameReady]: ", event.data);
+                let response = JSON.parse(event.data);
+
+                if (!response.ok) {
+                    console.log("连接游戏失败!");
+                    alert("连接游戏失败！reason = " + response.reason);
+                    //如果出现连接失败的情况，就回到游戏大厅
+                    //location.href = "/game_hall.html";
+                    location.replace("/game_hall.html");
+                    return;
+                }
+
+                if (response.message == 'gameReady') {
+                    gameInfo.roomId = response.roomId;
+                    gameInfo.thisUserId = response.thisUserId;
+                    gameInfo.thatUserId = response.thatUserId;
+                    //先手是不是当前用户
+                    gameInfo.isWhite = (response.whiteUser == gameInfo.thisUserId);
+
+                    //初始化棋盘
+                    //初始化游戏
+                    initGame();
+                    //设置初始提示
+                    setScreenText(gameInfo.isWhite);
+                    console.log("游戏已初始化！");
+                } else if (response.message == 'repeatConnection') {
+                    alert("出现重复登陆！");
+                    //location.href = "/login.html";
+                    location.replace("/login.html");
+                    return;
+                }
+            }
+        }
+
+        function initGame() {
+            me = gameInfo.isWhite;
+            over = false;
+            chessBoard = [];
+
+            // 初始化棋盘数组
+            for (let i = 0; i < 15; i++) {
+                chessBoard[i] = [];
+                for (let j = 0; j < 15; j++) {
+                    chessBoard[i][j] = 0;
+                }
+            }
+
+            //清空历史棋子
+            allSteps = [];
+            let chess = document.querySelector('#chess');
+            let context = chess.getContext('2d');
+
+            // 绘制棋盘
+            function drawBoard() {
+                // 白色背景
+                context.fillStyle = "#FFFFFF";
+                context.fillRect(0, 0, 450, 450);
+
+                // 绘制网格线
+                context.strokeStyle = "#BFBFBF";
+                context.lineWidth = 1;
+
+                for (let i = 0; i < 15; i++) {
+                    context.beginPath();
+                    context.moveTo(15 + i * 30, 15);
+                    context.lineTo(15 + i * 30, 435);
+                    context.stroke();
+
+                    context.beginPath();
+                    context.moveTo(15, 15 + i * 30);
+                    context.lineTo(435, 15 + i * 30);
+                    context.stroke();
+                }
+            }
+
+            drawBoard();
+
+            function oneStep(i, j, isWhite) {
+                //绘制网格线
+                //drawBoard();
+                //画棋子
+                context.beginPath();
+                context.arc(15 + i * 30, 15 + j * 30, 13, 0, 2 * Math.PI);
+                context.closePath();
+
+                // 白棋添加阴影
+                if (isWhite) {
+                    context.shadowColor = "rgba(0, 0, 0, 0.8)";
+                    context.shadowBlur = 8;
+                    context.shadowOffsetX = 2;
+                    context.shadowOffsetY = 2;
+                } else {
+                    context.shadowColor = "transparent";
+                    context.shadowBlur = 0;
+                    context.shadowOffsetX = 0;
+                    context.shadowOffsetY = 0;
+                }
+
+                var gradient = context.createRadialGradient(
+                    15 + i * 30 + 2, 15 + j * 30 - 2, 13,
+                    15 + i * 30 + 2, 15 + j * 30 - 2, 0
+                );
+
+                if (!isWhite) {
+                    gradient.addColorStop(0, "#0A0A0A");
+                    gradient.addColorStop(1, "#636766");
+                } else {
+                    gradient.addColorStop(0, "#D1D1D1");
+                    gradient.addColorStop(1, "#F9F9F9");
+                }
+                context.fillStyle = gradient;
+                context.fill();
+
+                // 重置阴影
+                context.shadowColor = "transparent";
+                context.shadowBlur = 0;
+                context.shadowOffsetX = 0;
+                context.shadowOffsetY = 0;
+            }
+
+            // 点击事件
+            chess.onclick = function (e) {
+                if (over) {
+                    return;
+                }
+                if (!me) {
+                    return;
+                }
+
+                let rect = chess.getBoundingClientRect();
+                let scaleX = 450 / rect.width;
+                let scaleY = 450 / rect.height;
+
+                let x = (e.clientX - rect.left) * scaleX;
+                let y = (e.clientY - rect.top) * scaleY;
+
+                let col = Math.floor(x / 30);
+                let row = Math.floor(y / 30);
+
+                // 检查坐标是否在棋盘范围内
+                if (col < 0 || col >= 15 || row < 0 || row >= 15) {
+                    return;
+                }
+
+                // 检查该位置是否已有棋子
+                if (chessBoard[row][col] == 0) {
+                    send(row, col);
+                }
+            };
+
+            function send(row, col) {
+                let request = {
+                    message: 'moveChess',
+                    userId: gameInfo.thisUserId,
+                    row: row,
+                    col: col
+                };
+                websocket.send(JSON.stringify(request));
+            }
+
+            //这里修改的是onmessage回调，之前的onmessage处理的是游戏就绪和初始化的逻辑
+            //一旦初始化完成，此时的onmessage就要处理"落子响应"
+            websocket.onmessage = function (event) {
+                console.log("[handlerMoveChess]", event.data);
+
+                let response;
+
+                try {
+                    response = JSON.parse(event.data);
+                } catch (e) {
+                    console.error("响应不合法", e);
+                    return;
+                }
+
+                if (response.message !== 'moveChess') {
+                    console.warn("响应类型错误，message=", response.message);
+                    return;
+                }
+
+                const row = Number(response.row);
+                const col = Number(response.col);
+
+                // 防止服务端返回非法坐标，避免访问 chessBoard[undefined][undefined]
+                if (
+                    !Number.isInteger(row) ||
+                    !Number.isInteger(col) ||
+                    row < 0 ||
+                    row >= 15 ||
+                    col < 0 ||
+                    col >= 15
+                ) {
+                    console.warn("收到非法落子坐标，row=, col=", row, col);
+                    return;
+                }
+
+                let isWhite;
+
+                if (response.userId === gameInfo.thisUserId) {
+                    //自己落的子
+                    isWhite = gameInfo.isWhite;
+                } else if (response.userId === gameInfo.thatUserId) {
+                    //对手落的子
+                    isWhite = !gameInfo.isWhite;
+                } else {
+                    console.warn(
+                        "响应的 userId 错误，userId=",
+                        response.userId
+                    );
+                    return;
+                }
+
+                // 防止服务端重复推送同一个落子消息
+                if (chessBoard[row][col] !== 0) {
+                    console.warn(
+                        "该位置已经有棋子，row=, col=",
+                        row,
+                        col
+                    );
+                    return;
+                }
+
+                // 1 表示白棋，2 表示黑棋
+                chessBoard[row][col] = isWhite ? 1 : 2;
+
+                allSteps.push({
+                    row: row,
+                    col: col,
+                    isWhite: isWhite
+                });
+
+                oneStep(col, row, isWhite);
+
+                me = !me;
+                setScreenText(me);
+
+                console.log(
+                    "落子位置：row=, col=, userId=",
+                    row,
+                    col,
+                    response.userId
+                );
+
+                //判定游戏是否结束
+                let screenDiv = document.querySelector('#screen');
+                if (response.win != null && response.win !== 0) {
+                    if (response.win === gameInfo.thisUserId) {
+                        //alert("你赢了!");
+                        screenDiv.innerHTML = '你赢了!';
+                    } else if (response.win === gameInfo.thatUserId) {
+                        //alert("你输了!");
+                        screenDiv.innerHTML = '你输了!';
+                    } else {
+                        console.warn("接收到的 win 用户不存在，win=", response.win);
+                        alert("接收到的 win 有误：" + response.win);
+                    }
+
+                    over = true;
+                    //location.href = "/game_hall.html";
+
+                    //增加一个按钮，让玩家回到游戏大厅
+                    let backButton = document.createElement('button');
+                    backButton.innerHTML = '返回大厅';
+
+                    backButton.style.cssText = `
+                    margin-top: 20px;
+                    padding: 10px 35px;
+                    background: rgba(255, 235, 210, 0.7);
+                    color: #3d2c1e;
+                    border: 1px solid rgba(200, 180, 160, 0.25);
+                    border-radius: 40px;
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: background 0.2s ease;
+                    font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+                    `;
+
+                    backButton.onmouseenter = function () {
+                        this.style.background = 'rgba(255, 235, 210, 0.95)';
+                    };
+
+                    backButton.onmouseleave = function () {
+                        this.style.background = 'rgba(255, 235, 210, 0.7)';
+                    };
+
+                    backButton.onclick = function () {
+                        //location.href = "/game_hall.html";
+                        location.replace("/game_hall.html");
+                    }
+                    let fatherDiv = document.querySelector('.battle-dialog');
+                    fatherDiv.appendChild(backButton);
+                }
+            };
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏大厅 · 五子棋对战</title>
+    <link rel="icon" href="hall.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* ----- 全局重置 & 柔光背景 ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(145deg, #f7f3e9 0%, #e8e0d5 100%);
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* ----- 导航栏 ----- */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 14px 40px;
+            background: rgba(30, 30, 35, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            color: #f5efe8;
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #b8a58b;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-left .icon {
+            font-size: 2.2rem;
+            line-height: 1;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+        }
+
+        .nav-left .brand {
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: #f5efe8;
+        }
+
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 6px 18px 6px 14px;
+            border-radius: 60px;
+            border: 1px solid rgba(255, 235, 210, 0.2);
+            backdrop-filter: blur(4px);
+        }
+
+        .nav-user .avatar {
+            font-size: 1.8rem;
+            line-height: 1;
+        }
+
+        .nav-user .username {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #f5efe8;
+            letter-spacing: 0.5px;
+        }
+
+        /* ----- 主容器  ----- */
+        .hall-container {
+            width: 100%;
+            max-width: 560px;
+            margin: 100px auto 40px;
+            padding: 0 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 70vh;
+        }
+
+        /* ----- 大厅卡片 ----- */
+        .hall-dialog {
+            background: rgba(255, 250, 242, 0.92);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border-radius: 48px 48px 48px 48px;
+            padding: 2.8rem 2.5rem 3rem;
+            width: 100%;
+            box-shadow:
+                0 20px 40px rgba(0, 0, 0, 0.25),
+                0 8px 16px rgba(0, 0, 0, 0.1),
+                inset 0 1px 4px rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 235, 210, 0.7);
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hall-dialog:hover {
+            box-shadow:
+                0 28px 56px rgba(0, 0, 0, 0.28),
+                0 10px 20px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+
+        /* 装饰性棋子  */
+        .hall-dialog::before {
+            content: "⚫⚪";
+            position: absolute;
+            bottom: -20px;
+            right: -10px;
+            font-size: 8rem;
+            opacity: 0.04;
+            pointer-events: none;
+            transform: rotate(12deg);
+            letter-spacing: 20px;
+            font-weight: 300;
+            color: #3d2c1e;
+        }
+
+        /* ----- 用户信息区域 (天梯积分 · 总场数 · 获胜) ----- */
+        .stats-grid {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            gap: 12px;
+            margin: 1.8rem 0 2.4rem 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: rgba(255, 245, 235, 0.5);
+            backdrop-filter: blur(2px);
+            padding: 14px 10px;
+            border-radius: 40px;
+            min-width: 90px;
+            flex: 1;
+            text-align: center;
+            border: 1px solid rgba(200, 180, 160, 0.25);
+            box-shadow: inset 0 1px 4px rgba(255, 255, 255, 0.6);
+            transition: all 0.2s ease;
+        }
+
+        .stat-item:hover {
+            background: rgba(255, 245, 235, 0.8);
+            border-color: #b8a58b;
+            transform: scale(1.02);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6b5a48;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #3d2c1e;
+            line-height: 1.2;
+        }
+
+        .stat-value small {
+            font-size: 1rem;
+            font-weight: 400;
+            color: #7a6a58;
+            margin-left: 2px;
+        }
+
+        /* 匹配按钮  */
+        #match-button {
+            width: 100%;
+            padding: 18px 20px;
+            background: #4d3a28;
+            border: none;
+            border-radius: 60px;
+            color: #fcf3e7;
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 6px 0 #2f2218, 0 6px 14px rgba(0, 0, 0, 0.2);
+            margin-top: 0.6rem;
+            text-transform: uppercase;
+            text-align: center;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        #match-button:hover {
+            background: #5f4a35;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 #2f2218, 0 10px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        #match-button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #2f2218, 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        #match-button .match-icon {
+            font-size: 1.8rem;
+            line-height: 1;
+        }
+
+        /* 登录提示 */
+        .logout-link {
+            text-align: center;
+            margin-top: 1.6rem;
+            font-size: 0.95rem;
+            color: #5f4a35;
+        }
+
+        .logout-link a {
+            color: #4d3a28;
+            font-weight: 600;
+            text-decoration: none;
+            border-bottom: 1px dotted #b8a58b;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .logout-link a:hover {
+            color: #2f2218;
+            border-bottom-color: #2f2218;
+        }
+
+        /* 行内小调整 */
+        .hall-dialog,
+        .hall-container,
+        .nav,
+        body {
+            background-origin: border-box;
+        }
+
+        .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        /* 响应式 */
+        @media (max-width: 520px) {
+            .hall-dialog {
+                padding: 2rem 1.5rem 2.2rem;
+                border-radius: 36px;
+            }
+
+            .nav {
+                padding: 12px 20px;
+                font-size: 1.4rem;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .nav-left .brand {
+                font-size: 1.4rem;
+            }
+
+            .nav-left .icon {
+                font-size: 1.8rem;
+            }
+
+            .nav-user {
+                padding: 4px 12px 4px 10px;
+            }
+
+            .nav-user .username {
+                font-size: 1rem;
+            }
+
+            .stat-item {
+                min-width: 70px;
+                padding: 10px 6px;
+            }
+
+            .stat-value {
+                font-size: 1.6rem;
+            }
+
+            #match-button {
+                font-size: 1.2rem;
+                padding: 14px 16px;
+            }
+
+            .stats-grid {
+                gap: 8px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .stats-grid {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .stat-item {
+                width: 100%;
+            }
+
+            .nav {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+                gap: 8px;
+            }
+
+            .nav-left {
+                justify-content: center;
+            }
+
+            .nav-user {
+                justify-content: center;
+            }
+        }
+
+        /* 清除Bootstrap按钮干扰 */
+        .btn,
+        .btn-primary {
+            background: none;
+            border: none;
+            box-shadow: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ===== 导航栏  ===== -->
+    <div class="nav">
+        <div class="nav-left">
+            <span class="brand">网页五子棋对战</span>
+        </div>
+        <div class="nav-user" id="navUser">
+            <span class="avatar">👤</span>
+            <span class="username" id="currentUsername">游客</span>
+        </div>
+    </div>
+
+    <!-- ===== 大厅容器 ===== -->
+    <div class="hall-container">
+        <div class="hall-dialog">
+            <!-- 用户信息 (天梯积分 · 总场数 · 获胜场数) -->
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">🏆 天梯积分</div>
+                    <div class="stat-value" id="ratingValue">1200</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">📊 总场数</div>
+                    <div class="stat-value" id="totalGamesValue">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">✅ 获胜</div>
+                    <div class="stat-value" id="winsValue">0</div>
+                </div>
+            </div>
+
+            <!-- 匹配按钮  -->
+            <div id="match-button">开始匹配</div>
+
+            <!-- 占位/登出 -->
+            <div class="logout-link">
+                <a href="login.html" id="logoutLink">切换账号</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery  -->
+    <script src="./js/jquery-3.x-git.min.js"></script>
+
+    <script>
+        let currentUser = null;
+        let websocket = null;
+        //页面加载时获取用户信息
+        function loadUserInfo() {
+            $.ajax({
+                type: 'get',
+                url: 'user/userInfo',
+                success: function (user) {
+                    currentUser = user;
+                    //更新显示的用户信息
+                    $('#currentUsername').text(user.username);
+                    //更新数据
+                    $('#ratingValue').text(user.score);
+                    $('#totalGamesValue').text(user.totalCount);
+                    $('#winsValue').text(user.winCount);
+                    console.log("用户信息加载成功:", currentUser);
+                    //用户加载成功后，再加载websocket初始化
+                    initWebSocket();
+                },
+                error: function (error) {
+                    console.log("获取用户信息失败：", error);
+                    alert("获取用户信息失败，请重试！");
+                    //获取失败就重新登录
+                    //location.href = "/login.html";
+                    location.replace("/login.html");
+                }
+            });
+        }
+
+        // 初始化 WebSocket
+        websocketUrl = 'ws://'+ location.host +'/match';
+        function initWebSocket() {
+            websocket = new WebSocket(websocketUrl);
+            console.log("开始初始化 WebSocket...");
+            websocket.onopen = function () {
+                console.log("WebSocket 连接已建立 (onopen)");
+            };
+
+            websocket.onclose = function () {
+                console.log("WebSocket 连接已关闭 (onclose)");
+            };
+
+            websocket.onerror = function () {
+                console.error("WebSocket 错误 (onerror)");
+            };
+
+            // 页面关闭时关闭 WebSocket，监听页面关闭情况
+            window.onbeforeunload = function () {
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.close();
+                }
+            };
+
+            websocket.onmessage = function (e) {
+                console.log("收到消息:", e.data);
+                let response = JSON.parse(e.data);
+                let matchButton = document.querySelector('#match-button');
+
+                if (!response.ok) {
+                    console.log("游戏大厅接收到了失败响应!" + response.reason);
+                    return;
+                }
+
+                if (response.message == 'startMatch') {
+                    console.log("成功进入匹配队列！");
+                    matchButton.innerHTML = '匹配中...(点击停止)';
+                } else if (response.message == 'stopMatch') {
+                    console.log("离开匹配队列！");
+                    matchButton.innerHTML = '开始匹配';
+                } else if (response.message == 'matchSuccess') {
+                    console.log("匹配成功！");
+                    //location.href = "/battle.html";
+                    location.replace("/battle.html");
+                } else if (response.message == 'repeatConnection') {//单独处理多开情况
+                    alert("出现重复登陆!");
+                    //location.href = "/login.html";
+                    location.replace("/login.html");
+                } else {
+                    console.log("出现错误：" + response.message);
+                }
+            };
+        }
+
+        //调用加载用户信息方法
+        $(document).ready(function () {
+            loadUserInfo();
+        })
+
+        //给匹配按钮添加点击事件
+        let matchButton = document.querySelector('#match-button');
+        matchButton.onclick = function () {
+            //在触发websocket请求之前，先确定websocket连接是否正常
+            if (websocket.readyState == websocket.OPEN) {
+                //如果状态是open的说明连接正常
+                //这里发送的数据有可能是开始匹配，也可能是停止匹配，分别讨论
+                //根据匹配按钮中的内容来区分
+                if (matchButton.innerHTML == '开始匹配') {
+                    console.log("开始匹配");
+                    console.log("发送的数据:", JSON.stringify({ message: 'startMatch' }));
+                    websocket.send(JSON.stringify({
+                        message: 'startMatch',
+                    }));
+                } else if (matchButton.innerHTML == '匹配中...(点击停止)') {
+                    console.log("停止匹配");
+                    console.log("发送的数据:", JSON.stringify({ message: 'stopMatch' }));
+                    websocket.send(JSON.stringify({
+                        message: 'stopMatch',
+                    }));
+                }
+            } else {
+                //连接异常，提示重新登陆
+                alert("当前您的连接已断开，请重新登录!");
+                //location.href = "/login.html";
+                location.replace("/login.html");
+            }
+        }
+        //点击切换账号时
+        document.getElementById('logoutLink').addEventListener('click', function (e) {
+            e.preventDefault();
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.close();
+            }
+            //location.href = '/login.html';
+            location.replace("/login.html");
+        });
+    </script>
+
+</body>
+
+</html>
